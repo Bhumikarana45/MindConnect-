@@ -20,9 +20,8 @@ export type Database = {
           created_at: string
           doctor_id: string
           id: string
-          notes: string | null
           patient_id: string
-          status: Database["public"]["Enums"]["appointment_status"]
+          status: string
           updated_at: string
         }
         Insert: {
@@ -30,9 +29,8 @@ export type Database = {
           created_at?: string
           doctor_id: string
           id?: string
-          notes?: string | null
           patient_id: string
-          status?: Database["public"]["Enums"]["appointment_status"]
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -40,9 +38,8 @@ export type Database = {
           created_at?: string
           doctor_id?: string
           id?: string
-          notes?: string | null
           patient_id?: string
-          status?: Database["public"]["Enums"]["appointment_status"]
+          status?: string
           updated_at?: string
         }
         Relationships: [
@@ -57,40 +54,37 @@ export type Database = {
       }
       doctors: {
         Row: {
-          bio: string | null
           certificate_url: string | null
           created_at: string
           hospital_name: string
           id: string
           registration_id: string
           specialization: string
-          status: Database["public"]["Enums"]["doctor_status"]
+          status: string
           updated_at: string
           user_id: string
           years_of_experience: number
         }
         Insert: {
-          bio?: string | null
           certificate_url?: string | null
           created_at?: string
           hospital_name: string
           id?: string
           registration_id: string
           specialization: string
-          status?: Database["public"]["Enums"]["doctor_status"]
+          status?: string
           updated_at?: string
           user_id: string
           years_of_experience?: number
         }
         Update: {
-          bio?: string | null
           certificate_url?: string | null
           created_at?: string
           hospital_name?: string
           id?: string
           registration_id?: string
           specialization?: string
-          status?: Database["public"]["Enums"]["doctor_status"]
+          status?: string
           updated_at?: string
           user_id?: string
           years_of_experience?: number
@@ -103,7 +97,6 @@ export type Database = {
           created_at: string
           id: string
           title: string
-          updated_at: string
           user_id: string
         }
         Insert: {
@@ -111,7 +104,6 @@ export type Database = {
           created_at?: string
           id?: string
           title: string
-          updated_at?: string
           user_id: string
         }
         Update: {
@@ -119,7 +111,6 @@ export type Database = {
           created_at?: string
           id?: string
           title?: string
-          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -191,8 +182,8 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
-          email: string
-          full_name: string
+          email?: string
+          full_name?: string
           id?: string
           updated_at?: string
           user_id: string
@@ -231,20 +222,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_all_users_with_roles: {
-        Args: never
-        Returns: {
-          created_at: string
-          email: string
-          full_name: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }[]
-      }
-      get_user_role: {
-        Args: { _user_id: string }
-        Returns: Database["public"]["Enums"]["app_role"]
-      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -255,8 +232,6 @@ export type Database = {
     }
     Enums: {
       app_role: "patient" | "doctor" | "admin"
-      appointment_status: "pending" | "confirmed" | "cancelled" | "completed"
-      doctor_status: "pending_approval" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -385,8 +360,6 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["patient", "doctor", "admin"],
-      appointment_status: ["pending", "confirmed", "cancelled", "completed"],
-      doctor_status: ["pending_approval", "approved", "rejected"],
     },
   },
 } as const
