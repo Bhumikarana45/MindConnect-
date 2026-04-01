@@ -1,0 +1,1 @@
+UPDATE public.user_roles SET role = 'admin' WHERE user_id = (SELECT user_id FROM public.profiles WHERE email = 'prachi12092003@gmail.com' LIMIT 1);
