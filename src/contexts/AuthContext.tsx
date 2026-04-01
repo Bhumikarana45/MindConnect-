@@ -179,16 +179,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    setUser(null);
+    setSession(null);
+    setRole(null);
+    setDoctorStatus(null);
     try {
       await supabase.auth.signOut();
     } catch (e) {
       console.error("Sign out error:", e);
     }
-    setUser(null);
-    setSession(null);
-    setRole(null);
-    setDoctorStatus(null);
-    window.location.replace("/login");
+    window.location.href = "/login";
   };
 
   const verifyOtp = async (email: string, token: string) => {
