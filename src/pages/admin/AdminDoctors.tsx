@@ -13,11 +13,38 @@ const AdminDoctors: React.FC = () => {
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
 
   const fetchDoctors = async () => {
-    const { data } = await supabase
+    const { data: doctorRows, error } = await supabase
       .from("doctors")
-      .select("*, profiles!doctors_user_id_fkey(full_name, email)")
+      .select("*")
       .order("created_at", { ascending: false });
-    setDoctors(data || []);
+
+    if (error) {
+      console.error("Failed to fetch doctors:", error);
+      setDoctors([]);
+      return;
+    }
+
+    // Fetch profiles separately since there's no FK relationship
+    const userIds = (doctorRows || []).map((d) => d.user_id);
+    let profileMap: Record<string, { full_name: string; email: string }> = {};
+
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email")
+        .in("user_id", userIds);
+
+      (profiles || []).forEach((p) => {
+        profileMap[p.user_id] = { full_name: p.full_name, email: p.email };
+      });
+    }
+
+    const merged = (doctorRows || []).map((doc) => ({
+      ...doc,
+      profiles: profileMap[doc.user_id] || null,
+    }));
+
+    setDoctors(merged);
   };
 
   useEffect(() => { fetchDoctors(); }, []);
