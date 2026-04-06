@@ -19,11 +19,29 @@ const DoctorDirectory: React.FC = () => {
 
   useEffect(() => {
     const fetchDoctors = async () => {
-      const { data } = await supabase
+      const { data: doctorRows } = await supabase
         .from("doctors")
-        .select("*, profiles!doctors_user_id_fkey(full_name, avatar_url)")
+        .select("*")
         .eq("status", "approved");
-      setDoctors(data || []);
+
+      const userIds = (doctorRows || []).map((d) => d.user_id);
+      let profileMap: Record<string, { full_name: string; avatar_url: string | null }> = {};
+
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name, avatar_url")
+          .in("user_id", userIds);
+
+        (profiles || []).forEach((p) => {
+          profileMap[p.user_id] = { full_name: p.full_name, avatar_url: p.avatar_url };
+        });
+      }
+
+      setDoctors((doctorRows || []).map((doc) => ({
+        ...doc,
+        profiles: profileMap[doc.user_id] || null,
+      })));
     };
     fetchDoctors();
   }, []);
