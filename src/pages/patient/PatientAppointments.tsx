@@ -22,12 +22,34 @@ const PatientAppointments: React.FC = () => {
 
   const fetchAppointments = async () => {
     if (!user) return;
-    const { data } = await supabase
+    const { data: aptRows } = await supabase
       .from("appointments")
-      .select("*, doctors(*, profiles!doctors_user_id_fkey(full_name))")
+      .select("*, doctors(*)")
       .eq("patient_id", user.id)
       .order("appointment_date", { ascending: false });
-    setAppointments(data || []);
+
+    // Fetch doctor profiles separately
+    const userIds = (aptRows || []).map((a) => a.doctors?.user_id).filter(Boolean);
+    let profileMap: Record<string, { full_name: string }> = {};
+
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", userIds);
+
+      (profiles || []).forEach((p) => {
+        profileMap[p.user_id] = { full_name: p.full_name };
+      });
+    }
+
+    setAppointments((aptRows || []).map((apt) => ({
+      ...apt,
+      doctors: apt.doctors ? {
+        ...apt.doctors,
+        profiles: profileMap[apt.doctors.user_id] || null,
+      } : null,
+    })));
   };
 
   useEffect(() => { fetchAppointments(); }, [user]);
