@@ -22,8 +22,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   }
 
   if (!user) return <Navigate to="/login" replace />;
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
-    return <Navigate to={`/${role}`} replace />;
+  if (allowedRoles && (!role || !allowedRoles.includes(role))) {
+    return <Navigate to={role ? `/${role}` : "/dashboard"} replace />;
   }
 
   // Block pending/rejected doctors from accessing doctor routes
