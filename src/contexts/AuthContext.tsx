@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 type AppRole = "patient" | "doctor" | "admin";
 
+const ROLE_PRIORITY: AppRole[] = ["admin", "doctor", "patient"];
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -35,88 +37,129 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const fetchRole = async (userId: string): Promise<AppRole | null> => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
-      .single();
-    return (data?.role as AppRole) || null;
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Failed to fetch user role:", error);
+      return null;
+    }
+
+    const roles = (data ?? []).map((entry) => entry.role as AppRole);
+    return ROLE_PRIORITY.find((candidate) => roles.includes(candidate)) ?? null;
   };
 
   const fetchDoctorStatus = async (userId: string): Promise<string | null> => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("doctors")
       .select("status")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
+
+    if (error) {
+      console.error("Failed to fetch doctor status:", error);
+      return null;
+    }
+
     return data?.status || null;
   };
 
   const ensureProfile = async (userId: string, email: string, fullName: string, selectedRole: AppRole) => {
-    // Check if profile exists
-    const { data: existing } = await supabase
+    const { data: existingProfile, error: profileLookupError } = await supabase
       .from("profiles")
       .select("id")
       .eq("user_id", userId)
-      .single();
-    
-    if (!existing) {
-      await supabase.from("profiles").insert({
+      .maybeSingle();
+
+    if (profileLookupError) {
+      console.error("Failed to check profile:", profileLookupError);
+    }
+
+    if (!existingProfile) {
+      const { error: profileInsertError } = await supabase.from("profiles").insert({
         user_id: userId,
         full_name: fullName || "",
         email: email || "",
       });
+
+      if (profileInsertError) {
+        console.error("Failed to create profile:", profileInsertError);
+      }
     }
 
-    // Check if role exists
-    const { data: existingRole } = await supabase
+    const { data: existingRole, error: roleLookupError } = await supabase
       .from("user_roles")
       .select("id")
       .eq("user_id", userId)
-      .single();
-    
+      .eq("role", selectedRole)
+      .maybeSingle();
+
+    if (roleLookupError) {
+      console.error("Failed to check role:", roleLookupError);
+    }
+
     if (!existingRole) {
-      await supabase.from("user_roles").insert({
+      const { error: roleInsertError } = await supabase.from("user_roles").insert({
         user_id: userId,
         role: selectedRole,
       });
+
+      if (roleInsertError) {
+        console.error("Failed to create role:", roleInsertError);
+      }
     }
   };
 
-  const handleSession = async (session: Session | null) => {
-    setSession(session);
-    setUser(session?.user ?? null);
-    if (session?.user) {
-      const meta = session.user.user_metadata;
-      // Ensure profile exists as fallback
+  const handleSession = async (nextSession: Session | null) => {
+    setLoading(true);
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+
+    try {
+      if (!nextSession?.user) {
+        setRole(null);
+        setDoctorStatus(null);
+        return;
+      }
+
+      const meta = nextSession.user.user_metadata;
+
       await ensureProfile(
-        session.user.id,
-        session.user.email || "",
+        nextSession.user.id,
+        nextSession.user.email || "",
         meta?.full_name || "",
         (meta?.role as AppRole) || "patient"
       );
-      const userRole = await fetchRole(session.user.id);
+
+      const userRole = await fetchRole(nextSession.user.id);
       setRole(userRole);
+
       if (userRole === "doctor") {
-        const status = await fetchDoctorStatus(session.user.id);
+        const status = await fetchDoctorStatus(nextSession.user.id);
         setDoctorStatus(status);
       } else {
         setDoctorStatus(null);
       }
-    } else {
+    } catch (error) {
+      console.error("Failed to sync auth session:", error);
       setRole(null);
       setDoctorStatus(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await handleSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      window.setTimeout(() => {
+        void handleSession(nextSession);
+      }, 0);
     });
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      await handleSession(session);
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      void handleSession(session);
     });
 
     return () => subscription.unsubscribe();
