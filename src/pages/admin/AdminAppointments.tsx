@@ -10,11 +10,35 @@ const AdminAppointments: React.FC = () => {
 
   useEffect(() => {
     const fetch = async () => {
-      const { data } = await supabase
+      const { data: aptRows } = await supabase
         .from("appointments")
-        .select("*, doctors(profiles!doctors_user_id_fkey(full_name)), profiles!appointments_patient_id_fkey(full_name)")
+        .select("*, doctors(*)")
         .order("appointment_date", { ascending: false });
-      setAppointments(data || []);
+
+      // Gather all user_ids: patient_ids + doctor user_ids
+      const patientIds = (aptRows || []).map((a) => a.patient_id).filter(Boolean);
+      const doctorUserIds = (aptRows || []).map((a) => a.doctors?.user_id).filter(Boolean);
+      const allUserIds = [...new Set([...patientIds, ...doctorUserIds])];
+
+      let profileMap: Record<string, { full_name: string }> = {};
+      if (allUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", allUserIds);
+        (profiles || []).forEach((p) => {
+          profileMap[p.user_id] = { full_name: p.full_name };
+        });
+      }
+
+      setAppointments((aptRows || []).map((apt) => ({
+        ...apt,
+        profiles: profileMap[apt.patient_id] || null,
+        doctors: apt.doctors ? {
+          ...apt.doctors,
+          profiles: profileMap[apt.doctors.user_id] || null,
+        } : null,
+      })));
     };
     fetch();
   }, []);
