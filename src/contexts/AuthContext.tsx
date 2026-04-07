@@ -201,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      await supabase.from("doctors").insert({
+      const { error: doctorInsertError } = await supabase.from("doctors").insert({
         user_id: data.user.id,
         registration_id: doctorData.registrationId,
         hospital_name: doctorData.hospitalName,
@@ -210,6 +210,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         certificate_url: certificateUrl,
         status: "pending_approval",
       });
+
+      if (doctorInsertError) {
+        console.error("Failed to insert doctor record:", doctorInsertError);
+        return { error: "Account created but failed to save doctor details. Please contact support." };
+      }
     }
 
     return { error: null };
