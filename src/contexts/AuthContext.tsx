@@ -27,6 +27,8 @@ export interface DoctorSignupData {
   certificateFile?: File;
 }
 
+type PendingDoctorMetadata = Omit<DoctorSignupData, "certificateFile">;
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -64,6 +66,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return data?.status || null;
+  };
+
+  const getPendingDoctorData = (currentUser: User): PendingDoctorMetadata | null => {
+    const pendingDoctorData = currentUser.user_metadata?.doctor_details as Partial<PendingDoctorMetadata> | undefined;
+
+    if (!pendingDoctorData?.registrationId || !pendingDoctorData.hospitalName || !pendingDoctorData.specialization) {
+      return null;
+    }
+
+    return {
+      registrationId: pendingDoctorData.registrationId,
+      hospitalName: pendingDoctorData.hospitalName,
+      specialization: pendingDoctorData.specialization,
+      yearsOfExperience: Number(pendingDoctorData.yearsOfExperience) || 0,
+    };
+  };
+
+  const syncDoctorRecord = async (currentUser: User): Promise<string | null> => {
+    const existingStatus = await fetchDoctorStatus(currentUser.id);
+    if (existingStatus) return existingStatus;
+
+    const pendingDoctorData = getPendingDoctorData(currentUser);
+    if (!pendingDoctorData) return null;
+
+    const { error: doctorInsertError } = await supabase.from("doctors").insert({
+      user_id: currentUser.id,
+      registration_id: pendingDoctorData.registrationId,
+      hospital_name: pendingDoctorData.hospitalName,
+      specialization: pendingDoctorData.specialization,
+      years_of_experience: pendingDoctorData.yearsOfExperience,
+      status: "pending_approval",
+    });
+
+    if (doctorInsertError) {
+      if (doctorInsertError.code === "23505") {
+        return await fetchDoctorStatus(currentUser.id);
+      }
+
+      console.error("Failed to create doctor record from saved signup details:", doctorInsertError);
+      return null;
+    }
+
+    return "pending_approval";
   };
 
   const ensureProfile = async (userId: string, email: string, fullName: string, selectedRole: AppRole) => {
@@ -137,7 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRole(userRole);
 
       if (userRole === "doctor") {
-        const status = await fetchDoctorStatus(nextSession.user.id);
+        const status = await syncDoctorRecord(nextSession.user);
         setDoctorStatus(status);
       } else {
         setDoctorStatus(null);
@@ -177,45 +222,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: "An account with this email already exists." };
     }
 
-    const { data, error } = await supabase.auth.signUp({
+    const pendingDoctorData = selectedRole === "doctor" && doctorData ? {
+      registrationId: doctorData.registrationId,
+      hospitalName: doctorData.hospitalName,
+      specialization: doctorData.specialization,
+      yearsOfExperience: doctorData.yearsOfExperience,
+    } : undefined;
+
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName, role: selectedRole },
+        data: {
+          full_name: fullName,
+          role: selectedRole,
+          ...(pendingDoctorData ? { doctor_details: pendingDoctorData } : {}),
+        },
         emailRedirectTo: window.location.origin,
       },
     });
     if (error) return { error: error.message };
-
-    if (data.user && selectedRole === "doctor" && doctorData) {
-      let certificateUrl: string | null = null;
-      if (doctorData.certificateFile) {
-        const fileExt = doctorData.certificateFile.name.split(".").pop();
-        const filePath = `${data.user.id}/certificate.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from("certificates")
-          .upload(filePath, doctorData.certificateFile);
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage.from("certificates").getPublicUrl(filePath);
-          certificateUrl = urlData.publicUrl;
-        }
-      }
-
-      const { error: doctorInsertError } = await supabase.from("doctors").insert({
-        user_id: data.user.id,
-        registration_id: doctorData.registrationId,
-        hospital_name: doctorData.hospitalName,
-        specialization: doctorData.specialization,
-        years_of_experience: doctorData.yearsOfExperience,
-        certificate_url: certificateUrl,
-        status: "pending_approval",
-      });
-
-      if (doctorInsertError) {
-        console.error("Failed to insert doctor record:", doctorInsertError);
-        return { error: "Account created but failed to save doctor details. Please contact support." };
-      }
-    }
 
     return { error: null };
   };
@@ -240,8 +266,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const verifyOtp = async (email: string, token: string) => {
-    const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
     if (error) return { error: error.message };
+
+    if (data.session) {
+      await handleSession(data.session);
+    }
+
     return { error: null };
   };
 
