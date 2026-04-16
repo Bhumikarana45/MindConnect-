@@ -2,13 +2,13 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Calendar, MapPin, Award, Clock } from "lucide-react";
+import { MapPin, Award, Clock, Star } from "lucide-react";
 
 const DoctorDirectory: React.FC = () => {
   const { user } = useAuth();
@@ -25,7 +25,9 @@ const DoctorDirectory: React.FC = () => {
         .eq("status", "approved");
 
       const userIds = (doctorRows || []).map((d) => d.user_id);
+      const doctorIds = (doctorRows || []).map((d) => d.id);
       let profileMap: Record<string, { full_name: string; avatar_url: string | null }> = {};
+      let ratingsMap: Record<string, { avg: number; count: number }> = {};
 
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -38,9 +40,29 @@ const DoctorDirectory: React.FC = () => {
         });
       }
 
+      if (doctorIds.length > 0) {
+        const { data: ratings } = await supabase
+          .from("doctor_ratings")
+          .select("doctor_id, rating")
+          .in("doctor_id", doctorIds);
+
+        (ratings || []).forEach((r) => {
+          if (!ratingsMap[r.doctor_id]) {
+            ratingsMap[r.doctor_id] = { avg: 0, count: 0 };
+          }
+          ratingsMap[r.doctor_id].count += 1;
+          ratingsMap[r.doctor_id].avg += r.rating;
+        });
+
+        Object.keys(ratingsMap).forEach((id) => {
+          ratingsMap[id].avg = ratingsMap[id].avg / ratingsMap[id].count;
+        });
+      }
+
       setDoctors((doctorRows || []).map((doc) => ({
         ...doc,
         profiles: profileMap[doc.user_id] || null,
+        ratings: ratingsMap[doc.id] || null,
       })));
     };
     fetchDoctors();
@@ -86,7 +108,7 @@ const DoctorDirectory: React.FC = () => {
                       {doc.profiles?.full_name?.charAt(0) || "D"}
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-display font-semibold text-foreground">Dr. {doc.profiles?.full_name}</h3>
+                      <h3 className="font-display font-semibold text-foreground">Dr. {doc.profiles?.full_name || "Unknown"}</h3>
                       <p className="text-sm text-primary">{doc.specialization}</p>
                     </div>
                   </div>
@@ -100,6 +122,16 @@ const DoctorDirectory: React.FC = () => {
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Award className="h-3.5 w-3.5" /> Reg: {doc.registration_id}
                     </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                      {doc.ratings ? (
+                        <span className="font-medium text-foreground">
+                          {doc.ratings.avg.toFixed(1)} <span className="text-muted-foreground font-normal">({doc.ratings.count} {doc.ratings.count === 1 ? "review" : "reviews"})</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">No reviews yet</span>
+                      )}
+                    </div>
                   </div>
                   <Button className="mt-4 w-full" onClick={() => setSelectedDoctor(doc)}>Book Appointment</Button>
                 </CardContent>
@@ -108,7 +140,6 @@ const DoctorDirectory: React.FC = () => {
           </div>
         )}
 
-        {/* Booking dialog */}
         <Dialog open={!!selectedDoctor} onOpenChange={() => setSelectedDoctor(null)}>
           <DialogContent>
             <DialogHeader>
