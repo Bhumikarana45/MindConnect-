@@ -185,15 +185,15 @@ const PHQ9Test: React.FC = () => {
             <CardTitle className="mt-2 font-display text-lg">{questions[step]}</CardTitle>
           </CardHeader>
           <CardContent>
-            <RadioGroup value={answers[step]?.toString()} onValueChange={(v) => handleAnswer(parseInt(v))}>
+            <RadioGroup key={step} value={answers[step] !== null ? answers[step]!.toString() : ""} onValueChange={(v) => handleAnswer(parseInt(v))}>
               <div className="space-y-3">
                 {options.map((opt) => (
                   <Label
                     key={opt.value}
-                    htmlFor={`opt-${opt.value}`}
+                    htmlFor={`opt-${step}-${opt.value}`}
                     className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-secondary has-[:checked]:border-primary has-[:checked]:bg-primary/5"
                   >
-                    <RadioGroupItem id={`opt-${opt.value}`} value={opt.value.toString()} />
+                    <RadioGroupItem id={`opt-${step}-${opt.value}`} value={opt.value.toString()} />
                     <span className="text-sm font-medium text-foreground">{opt.label}</span>
                   </Label>
                 ))}
