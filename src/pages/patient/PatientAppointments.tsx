@@ -2,12 +2,15 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Calendar, Clock } from "lucide-react";
+import { Calendar, Clock, Star } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   pending: "bg-warning/10 text-warning border-warning/20",
@@ -19,6 +22,12 @@ const statusColors: Record<string, string> = {
 const PatientAppointments: React.FC = () => {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [ratedAppointments, setRatedAppointments] = useState<Set<string>>(new Set());
+  const [ratingDialog, setRatingDialog] = useState<any>(null);
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [review, setReview] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchAppointments = async () => {
     if (!user) return;
@@ -28,7 +37,6 @@ const PatientAppointments: React.FC = () => {
       .eq("patient_id", user.id)
       .order("appointment_date", { ascending: false });
 
-    // Fetch doctor profiles separately
     const userIds = (aptRows || []).map((a) => a.doctors?.user_id).filter(Boolean);
     let profileMap: Record<string, { full_name: string }> = {};
 
@@ -37,11 +45,18 @@ const PatientAppointments: React.FC = () => {
         .from("profiles")
         .select("user_id, full_name")
         .in("user_id", userIds);
-
       (profiles || []).forEach((p) => {
         profileMap[p.user_id] = { full_name: p.full_name };
       });
     }
+
+    // Fetch existing ratings for this user's appointments
+    const { data: existingRatings } = await supabase
+      .from("doctor_ratings")
+      .select("appointment_id")
+      .eq("patient_id", user.id);
+
+    setRatedAppointments(new Set((existingRatings || []).map((r) => r.appointment_id)));
 
     setAppointments((aptRows || []).map((apt) => ({
       ...apt,
@@ -57,6 +72,40 @@ const PatientAppointments: React.FC = () => {
   const handleCancel = async (id: string) => {
     await supabase.from("appointments").update({ status: "cancelled" }).eq("id", id);
     toast.success("Appointment cancelled");
+    fetchAppointments();
+  };
+
+  const openRatingDialog = (apt: any) => {
+    setRatingDialog(apt);
+    setRating(0);
+    setHoverRating(0);
+    setReview("");
+  };
+
+  const handleSubmitRating = async () => {
+    if (!user || !ratingDialog || rating === 0) {
+      toast.error("Please select a rating");
+      return;
+    }
+    if (review.length > 500) {
+      toast.error("Review must be under 500 characters");
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.from("doctor_ratings").insert({
+      doctor_id: ratingDialog.doctor_id,
+      patient_id: user.id,
+      appointment_id: ratingDialog.id,
+      rating,
+      review: review.trim() || null,
+    });
+    setSubmitting(false);
+    if (error) {
+      toast.error("Failed to submit rating. You may have already rated this appointment.");
+      return;
+    }
+    toast.success("Thank you for your review!");
+    setRatingDialog(null);
     fetchAppointments();
   };
 
@@ -109,12 +158,85 @@ const PatientAppointments: React.FC = () => {
                     {apt.status === "pending" && (
                       <Button variant="outline" size="sm" onClick={() => handleCancel(apt.id)}>Cancel</Button>
                     )}
+                    {apt.status === "completed" && !ratedAppointments.has(apt.id) && (
+                      <Button size="sm" variant="outline" onClick={() => openRatingDialog(apt)} className="gap-1.5">
+                        <Star className="h-3.5 w-3.5" /> Rate
+                      </Button>
+                    )}
+                    {apt.status === "completed" && ratedAppointments.has(apt.id) && (
+                      <Badge variant="outline" className="bg-success/10 text-success border-success/20 gap-1">
+                        <Star className="h-3 w-3 fill-current" /> Rated
+                      </Badge>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
+
+        {/* Rating Dialog */}
+        <Dialog open={!!ratingDialog} onOpenChange={() => setRatingDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-display">
+                Rate Dr. {ratingDialog?.doctors?.profiles?.full_name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-5 pt-2">
+              <div className="space-y-2">
+                <Label>Your Rating</Label>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      className="rounded p-1 transition-transform hover:scale-110 focus:outline-none"
+                    >
+                      <Star
+                        className={`h-8 w-8 transition-colors ${
+                          star <= (hoverRating || rating)
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-muted-foreground/30"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                {rating > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {rating === 1 && "Poor"}
+                    {rating === 2 && "Fair"}
+                    {rating === 3 && "Good"}
+                    {rating === 4 && "Very Good"}
+                    {rating === 5 && "Excellent"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Review (optional)</Label>
+                <Textarea
+                  placeholder="Share your experience with this doctor..."
+                  value={review}
+                  onChange={(e) => setReview(e.target.value)}
+                  maxLength={500}
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground text-right">{review.length}/500</p>
+              </div>
+              <Button
+                onClick={handleSubmitRating}
+                disabled={rating === 0 || submitting}
+                className="w-full"
+              >
+                {submitting ? "Submitting..." : "Submit Review"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
