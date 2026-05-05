@@ -103,6 +103,8 @@ export type Database = {
           created_at: string
           hospital_name: string
           id: string
+          meeting_url: string | null
+          phone_number: string | null
           registration_id: string
           specialization: string
           status: string
@@ -115,6 +117,8 @@ export type Database = {
           created_at?: string
           hospital_name: string
           id?: string
+          meeting_url?: string | null
+          phone_number?: string | null
           registration_id: string
           specialization: string
           status?: string
@@ -127,6 +131,8 @@ export type Database = {
           created_at?: string
           hospital_name?: string
           id?: string
+          meeting_url?: string | null
+          phone_number?: string | null
           registration_id?: string
           specialization?: string
           status?: string
