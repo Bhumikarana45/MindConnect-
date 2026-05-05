@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Calendar, Clock, Star } from "lucide-react";
+import { Calendar, Clock, Star, Phone, MessageCircle, Video, PlayCircle } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   pending: "bg-warning/10 text-warning border-warning/20",
@@ -170,6 +170,58 @@ const PatientAppointments: React.FC = () => {
                     )}
                   </div>
                 </CardContent>
+                {(apt.status === "confirmed" || apt.status === "pending") && (
+                  <div className="flex flex-wrap gap-2 border-t border-border/60 px-6 py-3 bg-muted/30">
+                    {(() => {
+                      const aptTime = new Date(apt.appointment_date).getTime();
+                      const canStart = Date.now() >= aptTime - 5 * 60 * 1000; // 5 min early
+                      const phone = apt.doctors?.phone_number;
+                      const meet = apt.doctors?.meeting_url;
+                      const phoneDigits = phone ? phone.replace(/[^\d+]/g, "") : "";
+                      const waNumber = phoneDigits.replace(/^\+/, "");
+                      return (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled={!canStart || !meet}
+                            onClick={() => meet && window.open(meet, "_blank")}
+                            className="gap-1.5"
+                            title={!canStart ? "Available at appointment time" : !meet ? "Doctor hasn't set a meeting URL" : ""}
+                          >
+                            <PlayCircle className="h-3.5 w-3.5" /> Start Session
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!phone}
+                            onClick={() => phone && (window.location.href = `tel:${phoneDigits}`)}
+                            className="gap-1.5"
+                          >
+                            <Phone className="h-3.5 w-3.5" /> Call
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!waNumber}
+                            onClick={() => waNumber && window.open(`https://wa.me/${waNumber}`, "_blank")}
+                            className="gap-1.5"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!meet}
+                            onClick={() => meet && window.open(meet, "_blank")}
+                            className="gap-1.5"
+                          >
+                            <Video className="h-3.5 w-3.5" /> Join Video
+                          </Button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
               </Card>
             ))}
           </div>

@@ -10,6 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Plus, BookOpen, Trash2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { detectRisk } from "@/lib/riskDetection";
 
 const Journal: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +22,7 @@ const Journal: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
+  const risk = detectRisk(`${title} ${content}`);
 
   const fetchEntries = async () => {
     if (!user) return;
@@ -75,6 +79,24 @@ const Journal: React.FC = () => {
               <div className="space-y-4 pt-4">
                 <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
                 <Textarea placeholder="Write your thoughts..." value={content} onChange={(e) => setContent(e.target.value)} className="min-h-[200px] resize-none" />
+                {risk.level === "high" && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>We're concerned about you</AlertTitle>
+                    <AlertDescription>
+                      Your words suggest you may be in crisis. Please reach out to a doctor immediately or call a helpline (India: iCall 9152987821, AASRA 9820466726).
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {risk.level === "medium" && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Take care of yourself</AlertTitle>
+                    <AlertDescription>
+                      It sounds like you're going through a tough time. Consider booking a session with one of our doctors.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <Button onClick={handleSave} disabled={saving || !title.trim() || !content.trim()} className="w-full">
                   {saving ? "Saving..." : "Save Entry"}
                 </Button>
