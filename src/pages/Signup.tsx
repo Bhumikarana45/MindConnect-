@@ -32,6 +32,7 @@ const Signup: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+    if (tab === "doctor" && !certificateFile) { toast.error("Please upload your certificate / license"); return; }
     setLoading(true);
 
     let doctorData: DoctorSignupData | undefined;
