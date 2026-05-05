@@ -1,23 +1,82 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent } from "@/components/ui/card";
-import { ClipboardList } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Phone, Video } from "lucide-react";
 
 const DoctorSchedule: React.FC = () => {
+  const { user } = useAuth();
+  const [phone, setPhone] = useState("");
+  const [meetingUrl, setMeetingUrl] = useState("");
+  const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("doctors")
+        .select("id, phone_number, meeting_url")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        setDoctorId(data.id);
+        setPhone(data.phone_number || "");
+        setMeetingUrl(data.meeting_url || "");
+      }
+    })();
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!doctorId) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("doctors")
+      .update({ phone_number: phone.trim() || null, meeting_url: meetingUrl.trim() || null })
+      .eq("id", doctorId);
+    setSaving(false);
+    if (error) { toast.error("Failed to save"); return; }
+    toast.success("Contact details updated");
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
         <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Schedule</h1>
-          <p className="text-muted-foreground">Manage your availability and schedule.</p>
+          <h1 className="font-display text-2xl font-bold text-foreground">Schedule & Contact</h1>
+          <p className="text-muted-foreground">Configure how patients reach you for sessions.</p>
         </div>
-        <Card className="shadow-card">
-          <CardContent className="flex flex-col items-center py-16 text-center">
-            <ClipboardList className="h-12 w-12 text-muted-foreground/30" />
-            <h3 className="mt-4 font-display text-lg font-semibold">Schedule Management</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your confirmed appointments will appear here. Manage your availability through the Appointments tab.
-            </p>
+        <Card className="shadow-card max-w-xl">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">Session Contact Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2"><Phone className="h-4 w-4" /> Phone Number</Label>
+              <Input
+                placeholder="+919876543210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Used for Call & WhatsApp buttons. Include country code.</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2"><Video className="h-4 w-4" /> Video Meeting URL</Label>
+              <Input
+                placeholder="https://meet.google.com/xyz-abcd-efg"
+                value={meetingUrl}
+                onChange={(e) => setMeetingUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Google Meet, Zoom, or any video conferencing link.</p>
+            </div>
+            <Button onClick={handleSave} disabled={saving || !doctorId} className="w-full">
+              {saving ? "Saving..." : "Save Contact Details"}
+            </Button>
           </CardContent>
         </Card>
       </div>
