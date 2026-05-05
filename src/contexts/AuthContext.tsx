@@ -25,6 +25,7 @@ export interface DoctorSignupData {
   specialization: string;
   yearsOfExperience: number;
   certificateFile?: File;
+  certificateUrl?: string;
 }
 
 type PendingDoctorMetadata = Omit<DoctorSignupData, "certificateFile">;
@@ -80,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       hospitalName: pendingDoctorData.hospitalName,
       specialization: pendingDoctorData.specialization,
       yearsOfExperience: Number(pendingDoctorData.yearsOfExperience) || 0,
+      certificateUrl: pendingDoctorData.certificateUrl,
     };
   };
 
@@ -96,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       hospital_name: pendingDoctorData.hospitalName,
       specialization: pendingDoctorData.specialization,
       years_of_experience: pendingDoctorData.yearsOfExperience,
+      certificate_url: pendingDoctorData.certificateUrl ?? null,
       status: "pending_approval",
     });
 
@@ -222,11 +225,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: "An account with this email already exists." };
     }
 
+    let certificateUrl: string | undefined;
+    if (selectedRole === "doctor" && doctorData?.certificateFile) {
+      const file = doctorData.certificateFile;
+      const ext = file.name.split(".").pop() || "pdf";
+      const path = `pending/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("certificates")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (uploadError) {
+        return { error: `Certificate upload failed: ${uploadError.message}` };
+      }
+      const { data: pub } = supabase.storage.from("certificates").getPublicUrl(path);
+      certificateUrl = pub.publicUrl;
+    }
+
     const pendingDoctorData = selectedRole === "doctor" && doctorData ? {
       registrationId: doctorData.registrationId,
       hospitalName: doctorData.hospitalName,
       specialization: doctorData.specialization,
       yearsOfExperience: doctorData.yearsOfExperience,
+      certificateUrl,
     } : undefined;
 
     const { error } = await supabase.auth.signUp({
