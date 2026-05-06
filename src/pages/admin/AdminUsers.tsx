@@ -9,8 +9,18 @@ const AdminUsers: React.FC = () => {
 
   useEffect(() => {
     const fetch = async () => {
-      const { data } = await supabase.from("profiles").select("*, user_roles(role)");
-      setUsers(data || []);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
+      const { data: roles } = await supabase.from("user_roles").select("user_id, role");
+      const roleMap: Record<string, string[]> = {};
+      (roles || []).forEach((r: any) => {
+        roleMap[r.user_id] = [...(roleMap[r.user_id] || []), r.role];
+      });
+      setUsers(
+        (profiles || []).map((p: any) => ({ ...p, roles: roleMap[p.user_id] || [] }))
+      );
     };
     fetch();
   }, []);
@@ -41,9 +51,15 @@ const AdminUsers: React.FC = () => {
                       <td className="p-4 font-medium text-foreground">{u.full_name}</td>
                       <td className="p-4 text-sm text-muted-foreground">{u.email}</td>
                       <td className="p-4">
-                        <Badge variant="outline" className="capitalize">
-                          {u.user_roles?.[0]?.role || "unknown"}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {u.roles.length > 0 ? (
+                            u.roles.map((r: string) => (
+                              <Badge key={r} variant="outline" className="capitalize">{r}</Badge>
+                            ))
+                          ) : (
+                            <Badge variant="outline">unknown</Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
                     </tr>
