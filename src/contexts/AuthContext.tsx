@@ -216,10 +216,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, fullName: string, selectedRole: AppRole, doctorData?: DoctorSignupData) => {
     // Check if email already has a different role
     const { data: existingProfile } = await supabase
-      .from("profiles")
-      .select("user_id")
-      .eq("email", email)
-      .single();
+  .from("profiles")
+  .select("user_id")
+  .eq("email", email)
+  .maybeSingle(); // ✅ returns null instead of 404 when no row found
     
     if (existingProfile) {
       return { error: "An account with this email already exists." };
