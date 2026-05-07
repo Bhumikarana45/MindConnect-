@@ -215,11 +215,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, fullName: string, selectedRole: AppRole, doctorData?: DoctorSignupData) => {
     // Check if email already has a different role
-    const { data: existingProfile } = await supabase
+   const { data: existingProfile } = await supabase
   .from("profiles")
   .select("user_id")
   .eq("email", email)
-  .maybeSingle(); // ✅ returns null instead of 404 when no row found
+  .maybeSingle(); // ✅ not .single()
+
     
     if (existingProfile) {
       return { error: "An account with this email already exists." };
@@ -231,12 +232,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const ext = file.name.split(".").pop() || "pdf";
       const path = `pending/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: uploadError } = await supabase.storage
-        .from("certificates")
-        .upload(path, file, { contentType: file.type, upsert: false });
+        .from("certificate")
+.upload(path, file, { contentType: file.type, upsert: false });
       if (uploadError) {
         return { error: `Certificate upload failed: ${uploadError.message}` };
       }
-      const { data: pub } = supabase.storage.from("certificates").getPublicUrl(path);
+const { data: pub } = supabase.storage.from("certificate").getPublicUrl(path);
       certificateUrl = pub.publicUrl;
     }
 
@@ -273,11 +274,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 const signOut = async () => {
   try {
-    await supabase.auth.signOut(); // ✅ Sign out FIRST, session still exists
+    await supabase.auth.signOut();
   } catch (e) {
     console.error("Sign out error:", e);
   } finally {
-    window.location.href = "/login"; // Always redirect, even if signOut throws
+    window.location.href = "/login";
   }
 };
 

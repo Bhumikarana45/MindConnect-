@@ -68,10 +68,10 @@ const DoctorDashboard: React.FC = () => {
       const fileExt = certificateFile.name.split(".").pop();
       const filePath = `${user.id}/certificate.${fileExt}`;
       const { error: uploadError } = await supabase.storage
-        .from("certificates")
+        .from("certificate")
         .upload(filePath, certificateFile, { upsert: true });
       if (!uploadError) {
-        const { data: urlData } = supabase.storage.from("certificates").getPublicUrl(filePath);
+        const { data: urlData } = supabase.storage.from("certificate").getPublicUrl(filePath);
         certificateUrl = urlData.publicUrl;
       }
     }
