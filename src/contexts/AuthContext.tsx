@@ -271,18 +271,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: null };
   };
 
-  const signOut = async () => {
-    setUser(null);
-    setSession(null);
-    setRole(null);
-    setDoctorStatus(null);
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.error("Sign out error:", e);
-    }
-    window.location.href = "/login";
-  };
+const signOut = async () => {
+  try {
+    await supabase.auth.signOut(); // ✅ Sign out FIRST, session still exists
+  } catch (e) {
+    console.error("Sign out error:", e);
+  } finally {
+    window.location.href = "/login"; // Always redirect, even if signOut throws
+  }
+};
 
   const verifyOtp = async (email: string, token: string) => {
     const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
