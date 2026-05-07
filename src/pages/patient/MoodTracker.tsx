@@ -48,8 +48,7 @@ const MoodTracker: React.FC = () => {
       note: note || null,
     });
     setSaving(false);
-    if (error) { toast.error("Failed to save mood"); return; }
-    toast.success("Mood logged!");
+if (error) { toast.error("Failed to save mood: " + error.message); return; }    toast.success("Mood logged!");
     setSelectedMood(null);
     setNote("");
     fetchEntries();
