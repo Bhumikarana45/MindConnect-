@@ -149,9 +149,9 @@ const PHQ9Test: React.FC = () => {
               <div className="rounded-lg bg-destructive/5 p-4">
                 <p className="text-sm font-medium text-foreground">Emergency Resources:</p>
                 <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <li>• National Suicide Prevention: <strong>988</strong></li>
-                  <li>• Crisis Text Line: Text <strong>HOME</strong> to <strong>741741</strong></li>
-                  <li>• Emergency Services: <strong>911</strong></li>
+                  <li>• National Suicide Prevention: <strong>14416</strong></li>
+                  <li>• Crisis Text Line: Text <strong>HOME</strong> to <strong>9999666555</strong></li>
+                  <li>• Emergency Services: <strong>112</strong></li>
                 </ul>
               </div>
               <Button className="w-full" onClick={() => { setShowEmergency(false); window.location.href = "/patient/doctors"; }}>
